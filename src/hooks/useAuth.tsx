@@ -6,6 +6,7 @@ interface UserInfo {
   username?: string;
   email?: string;
   roles?: string[];
+  permissions?: string[];
   exp: number;
   customerId?: string;
 }
@@ -56,6 +57,7 @@ const useAuth = () => {
         username: payload.username || payload.name,
         email: payload.email,
         roles: payload.roles || payload.role,
+        permissions: payload.permissions || [],
         exp: payload.exp,
         customerId: payload.customerId,
       };
@@ -63,6 +65,22 @@ const useAuth = () => {
       console.error("Error decodificando token:", error);
       return null;
     }
+  };
+
+  // Función para verificar si el usuario es administrador
+  const isAdmin = (userInfo: UserInfo | null): boolean => {
+    if (!userInfo || !userInfo.roles) return false;
+    
+    // Convierte a array si es un string
+    const roles = Array.isArray(userInfo.roles) ? userInfo.roles : [userInfo.roles];
+    
+    // Verifica diferentes posibles nombres de rol de admin
+    return roles.some(role => 
+      role.toLowerCase().includes('admin') || 
+      role.toLowerCase().includes('administrator') ||
+      role === 'admin' ||
+      role === 'ADMIN'
+    );
   };
 
   useEffect(() => {
@@ -78,7 +96,7 @@ const useAuth = () => {
         // Token inválido o expirado
         setIsAuthenticated(false);
         setUser(null);
-        const protectedRoutes = ["/profile", "/settings", "/admin"];
+        const protectedRoutes = ["/profile", "/settings", "/admin", "/adminDashboard"];
         if (protectedRoutes.includes(router.pathname)) {
           router.push("/login");
         }
@@ -86,7 +104,7 @@ const useAuth = () => {
     } else {
       setIsAuthenticated(false);
       setUser(null);
-      const protectedRoutes = ["/profile", "/settings", "/admin"];
+      const protectedRoutes = ["/profile", "/settings", "/admin", "/adminDashboard"];
       if (protectedRoutes.includes(router.pathname)) {
         router.push("/login");
       }
@@ -101,7 +119,13 @@ const useAuth = () => {
     if (userInfo) {
       setIsAuthenticated(true);
       setUser(userInfo);
-      router.push("/dashboard");
+      
+      // Redirección condicional basada en el rol del usuario
+      if (isAdmin(userInfo)) {
+        router.push("/adminDashboard");
+      } else {
+        router.push("/dashboard");
+      }
     } else {
       console.error("Token inválido en login");
     }
@@ -114,11 +138,14 @@ const useAuth = () => {
     router.push("/dashboard");
   };
 
+    // Exponer funciones para usar en componentes
   return {
     isAuthenticated,
     user,
     login,
     logout,
+    isAdmin: () => isAdmin(user), // Exponer función para usar en componentes
+
   };
 };
 
